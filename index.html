@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>What do you want to say today?</title>
+    <style>
+        :root {
+            --pad: 14px;
+            --bg-color: #0e0f12;
+            --text-color: #e9e9ee;
+            --paper-color: #fdfbf7;
+            --paper-text: #2c2c2c;
+        }
+
+        body {
+            font-family: "Courier New", Courier, monospace;
+            margin: 0;
+            padding: 0;
+            background: var(--bg-color);
+            color: var(--text-color);
+            overflow-x: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* --- Common Screen --- */
+        .screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: var(--pad);
+            box-sizing: border-box;
+            display: none;
+            /* Controlled by JS */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+
+        .screen.active {
+            display: flex;
+            opacity: 1;
+            z-index: 10;
+        }
+
+        /* --- Landing Page --- */
+        #landing {
+            z-index: 100;
+            cursor: pointer;
+        }
+
+        #typewriter {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text-color);
+            min-height: 1.5em;
+            text-align: center;
+            padding: 0 20px;
+            white-space: pre-wrap;
+            max-width: 80%;
+            line-height: 1.5;
+        }
+
+        #tap-hint {
+            margin-top: 60px;
+            font-size: 14px;
+            letter-spacing: 1px;
+            color: #888;
+            opacity: 0;
+            transition: opacity 1s ease;
+            animation: blink 2s infinite;
+            text-transform: uppercase;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 0.3;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 24px;
+            background-color: var(--text-color);
+            margin-left: 4px;
+            animation: cursorBlink 1s infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes cursorBlink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* --- Input Screen --- */
+        .paper-container {
+            width: 100%;
+            max-width: 600px;
+            position: relative;
+        }
+
+        /* The "Paper" styling */
+        .paper {
+            background: var(--paper-color);
+            color: var(--paper-text);
+            padding: 40px;
+            border-radius: 2px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            position: relative;
+            transform: rotate(-1deg);
+            transition: transform 0.3s ease;
+            margin-bottom: 30px;
+        }
+
+        .paper:hover {
+            transform: rotate(0deg) scale(1.005);
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 240px;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            color: var(--paper-text);
+            font-size: 18px;
+            font-family: inherit;
+            outline: none;
+            resize: vertical;
+            line-height: 1.6;
+            background-image: linear-gradient(#eee 1px, transparent 1px);
+            background-size: 100% 32px;
+            box-sizing: border-box;
+        }
+
+        /* --- Result Screen --- */
+        #result-screen {
+            justify-content: flex-start;
+            /* Parse from top */
+            padding-top: 40px;
+        }
+
+        .result-container {
+            width: 100%;
+            max-width: 640px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+            background: #0b0c10;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            margin-bottom: 20px;
+            image-rendering: pixelated;
+        }
+
+        /* Common Controls */
+        .row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+
+        button,
+        select {
+            border-radius: 20px;
+            border: 1px solid #444;
+            background: #222;
+            color: #eee;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button.primary {
+            background: #eee;
+            color: #111;
+            border-color: #eee;
+            font-weight: bold;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.2);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #9aa0ad;
+            margin-top: 10px;
+            text-align: center;
+            opacity: 0.6;
+        }
+
+        label {
+            color: #b9bcc6;
+            font-size: 14px;
+            margin-right: 6px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 1. Landing Screen -->
+    <div id="landing" class="screen active">
+        <div id="typewriter"></div>
+        <div id="tap-hint">Tap to continue</div>
+    </div>
+
+    <!-- 2. Input Screen -->
+    <div id="input-screen" class="screen">
+        <div class="paper-container">
+            <div class="paper">
+                <textarea id="input" placeholder="Start typing here..."></textarea>
+            </div>
+
+            <div class="row">
+                <button class="primary" id="btnGen">Generate</button>
+                <button id="btnRandom">Random Prompts</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Result Screen -->
+    <div id="result-screen" class="screen">
+        <div class="result-container">
+            <div class="row" style="margin-bottom: 20px;">
+                <label>Mode:</label>
+                <select id="mode">
+                    <option value="rings">Rings</option>
+                    <option value="barcode">Barcode</option>
+                    <option value="pixel">Pixel</option>
+                    <option value="wave">Wave</option>
+                </select>
+            </div>
+
+            <canvas id="canvas" width="1024" height="1024"></canvas>
+
+            <div class="row">
+                <button id="btnSave">Save Image</button>
+                <button id="btnBack">Write Another</button>
+            </div>
+
+            <p class="hint">
+                Unique text = Unique pattern & colors.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        /* -----------------------
+           UI Flow Implementation
+           ----------------------- */
+
+        // Navigation Helper
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(el => {
+                el.style.opacity = '0';
+                setTimeout(() => {
+                    el.classList.remove('active');
+                }, 500);
+            });
+
+            const target = document.getElementById(screenId);
+            setTimeout(() => {
+                target.classList.add('active');
+                // Force reflow
+                void target.offsetWidth;
+                target.style.opacity = '1';
+            }, 500);
+        }
+
+        // Landing Page Logic
+        const typewriterEl = document.getElementById("typewriter");
+        const tapHint = document.getElementById("tap-hint");
+        const landing = document.getElementById("landing");
+
+        const fullText = "What do you want to say today?";
+        let typeIdx = 0;
+        let isTypingDone = false;
+
+        function typeWriter() {
+            if (typeIdx < fullText.length) {
+                typewriterEl.innerHTML = fullText.substring(0, typeIdx + 1) + '<span class="cursor"></span>';
+                typeIdx++;
+                setTimeout(typeWriter, 100);
+            } else {
+                typewriterEl.innerHTML = fullText + '<span class="cursor"></span>';
+                isTypingDone = true;
+                tapHint.style.opacity = "1";
+            }
+        }
+
+        window.addEventListener('load', () => {
+            setTimeout(typeWriter, 800);
+        });
+
+        landing.addEventListener('click', () => {
+            if (!isTypingDone) return;
+            showScreen('input-screen');
+        });
+
+
+        /* -----------------------
+           Generation Logic
+           ----------------------- */
+
+        const elInput = document.getElementById("input");
+        const elMode = document.getElementById("mode");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: false });
+
+        document.getElementById("btnGen").addEventListener("click", async () => {
+            const text = elInput.value ?? "";
+            if (!text.trim()) return;
+
+            await generate(text);
+            showScreen('result-screen');
+        });
+
+        document.getElementById("btnRandom").addEventListener("click", async () => {
+            const samples = [
+                "I hope something good happens to you today.",
+                "The sun is also a star.",
+                "我遇見了一隻貓，她告訴我不必討好整個世界。",
+                "Lines, circles, and everything in between.",
+                "Stay soft. It looks beautiful on you.",
+                "今天我想吃薯條。"
+            ];
+            elInput.value = samples[Math.floor(Math.random() * samples.length)];
+
+            await generate(elInput.value);
+            showScreen('result-screen');
+        });
+
+        document.getElementById("btnBack").addEventListener("click", () => {
+            elInput.value = ""; // Clear or keep? "Write Another" implies new text.
+            showScreen('input-screen');
+        });
+
+        elMode.addEventListener("change", async () => {
+            // If user changes mode on result screen, regenerate
+            if (elInput.value.trim()) {
+                await generate(elInput.value);
+            }
+        });
+
+        document.getElementById("btnSave").addEventListener("click", () => {
+            const a = document.createElement("a");
+            a.href = canvas.toDataURL("image/png");
+            a.download = "souvenir.png";
+            a.click();
+        });
+
+
+        // ----------------------------------------
+        // Core Logic
+        // ----------------------------------------
+
+        async function shapeDigest(text) {
+            const enc = new TextEncoder();
+            const data = enc.encode(text);
+            const digest = await crypto.subtle.digest("SHA-256", data);
+            return new Uint8Array(digest);
+        }
+
+        function createRandom(seedBytes) {
+            let s = (seedBytes[0] << 24) | (seedBytes[1] << 16) | (seedBytes[2] << 8) | (seedBytes[3]);
+            let x = s >>> 0;
+            return function () {
+                x ^= (x << 13) >>> 0;
+                x ^= (x >>> 17) >>> 0;
+                x ^= (x << 5) >>> 0;
+                return (x >>> 0) / 4294967296;
+            };
+        }
+
+        function hexToBits(hex) {
+            let bits = "";
+            for (const ch of hex) {
+                const n = parseInt(ch, 16);
+                bits += n.toString(2).padStart(4, "0");
+            }
+            return bits;
+        }
+
+        function generateHSL(rand, satMin = 60, satRange = 40, ligMin = 40, ligRange = 40) {
+            const h = Math.floor(rand() * 360);
+            const s = satMin + Math.floor(rand() * satRange);
+            const l = ligMin + Math.floor(rand() * ligRange);
+            return `hsl(${h}, ${s}%, ${l}%)`;
+        }
+
+        function clampInt(v, lo, hi) { return Math.max(lo, Math.min(hi, v | 0)); }
+
+        async function generate(text) {
+            const size = 1024;
+            canvas.width = size;
+            canvas.height = size;
+
+            const bytes = await shapeDigest(text);
+            const rand = createRandom(bytes);
+
+            const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+            const bits = hexToBits(hex);
+
+            // Background
+            const bgHue = Math.floor(rand() * 360);
+            ctx.fillStyle = `hsl(${bgHue}, 15%, 8%)`;
+            ctx.fillRect(0, 0, size, size);
+
+            const mode = elMode.value;
+
+            if (mode === 'pixel') drawPixelGrid(bits, rand, size);
+            else if (mode === 'barcode') drawBarcode(bits, rand, size);
+            else if (mode === 'rings') drawRings(bits, rand, size);
+            else drawWaves(bits, rand, size);
+        }
+
+        /* --- Drawing Modes --- */
+
+        function drawPixelGrid(bits, rand, size) {
+            const cell = clampInt(size / 64, 10, 30);
+            const cols = Math.floor(size / cell);
+            const rows = Math.floor(size / cell);
+
+            const w = cols * cell, h = rows * cell;
+            const ox = Math.floor((size - w) / 2);
+            const oy = Math.floor((size - h) / 2);
+
+            const baseHue = Math.floor(rand() * 360);
+
+            let idx = 0;
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const b = bits[idx % bits.length]; idx++;
+                    const r = rand();
+                    const on = (b === "1") ? (r > 0.3) : (r > 0.85);
+
+                    if (on) {
+                        const hue = (baseHue + Math.floor(r * 60 - 30)) % 360;
+                        const lit = 40 + Math.floor(r * 40);
+                        ctx.fillStyle = `hsl(${hue}, 70%, ${lit}%)`;
+                        ctx.fillRect(ox + x * cell, oy + y * cell, cell - 1, cell - 1);
+                    }
+                }
+            }
+        }
+
+        function drawBarcode(bits, rand, size) {
+            const margin = Math.floor(size * 0.1);
+            const height = size - margin * 2;
+            const y0 = margin;
+
+            let x = margin;
+            let i = 0;
+
+            ctx.globalCompositeOperation = "screen";
+
+            while (x < size - margin) {
+                const b = bits[i % bits.length]; i++;
+                const r = rand();
+
+                const width = (b === '1') ? 4 + r * 10 : 1 + r * 4;
+                const gap = 2 + rand() * 8;
+
+                if (x + width > size - margin) break;
+                ctx.fillStyle = generateHSL(rand, 70, 30, 40, 40);
+                ctx.fillRect(x, y0, width, height);
+                x += width + gap;
+            }
+            ctx.globalCompositeOperation = "source-over";
+        }
+
+        function drawRings(bits, rand, size) {
+            const cx = size / 2, cy = size / 2;
+            const maxR = size * 0.4;
+            const step = 8;
+
+            let idx = 0;
+            ctx.lineCap = "round";
+
+            for (let r = 20; r <= maxR; r += step) {
+                const b = bits[idx % bits.length]; idx++;
+                const show = (b === "1") ? (rand() > 0.2) : (rand() > 0.8);
+
+                if (show) {
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+
+                    const lw = 2 + rand() * 4;
+                    ctx.lineWidth = lw;
+                    ctx.strokeStyle = generateHSL(rand);
+
+                    if (rand() > 0.7) {
+                        ctx.setLineDash([5 + rand() * 10, 5 + rand() * 10]);
+                    } else {
+                        ctx.setLineDash([]);
+                    }
+                    ctx.stroke();
+                }
+            }
+
+            ctx.fillStyle = generateHSL(rand);
+            ctx.beginPath();
+            ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawWaves(bits, rand, size) {
+            const rows = 20;
+            const rowH = size / (rows + 4);
+
+            ctx.lineWidth = 3;
+            ctx.lineJoin = "round";
+
+            for (let i = 0; i < rows; i++) {
+                const yBase = (i + 2) * rowH;
+
+                ctx.beginPath();
+                ctx.strokeStyle = generateHSL(rand);
+
+                let x = size * 0.1;
+                ctx.moveTo(x, yBase);
+
+                const freq = 0.01 + rand() * 0.04;
+                const amp = 10 + rand() * 30;
+
+                while (x < size * 0.9) {
+                    x += 5;
+                    const noise = Math.sin(x * freq + i) * Math.cos(x * freq * 0.5);
+                    const y = yBase + noise * amp;
+                    ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+        }
+
+    </script>
+</body>
+
+</html>
