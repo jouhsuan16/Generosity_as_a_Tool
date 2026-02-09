@@ -75,8 +75,12 @@
             color: #888;
             opacity: 0;
             transition: opacity 1s ease;
-            animation: blink 2s infinite;
             text-transform: uppercase;
+        }
+
+        .blinking {
+            animation: blink 2s infinite;
+            opacity: 1 !important;
         }
 
         @keyframes blink {
@@ -322,7 +326,10 @@
             } else {
                 typewriterEl.innerHTML = fullText + '<span class="cursor"></span>';
                 isTypingDone = true;
-                tapHint.style.opacity = "1";
+                setTimeout(() => {
+                    tapHint.classList.add("blinking");
+                    tapHint.style.opacity = "1";
+                }, 500);
             }
         }
 
